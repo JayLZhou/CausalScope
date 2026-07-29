@@ -72,9 +72,28 @@ class PropertyGraph:
     def node(self, node_id: int) -> GraphNode:
         return self._nodes[node_id]
 
+    def out_edges(self, node_id: int, label: str | None = None) -> tuple[GraphEdge, ...]:
+        return tuple(
+            edge
+            for edge in self._out_edges[node_id]
+            if label is None or edge.label == label
+        )
+
+    def in_edges(self, node_id: int, label: str | None = None) -> tuple[GraphEdge, ...]:
+        return tuple(
+            edge
+            for edge in self._in_edges[node_id]
+            if label is None or edge.label == label
+        )
+
+    def out_neighbors(self, node_id: int, label: str | None = None) -> tuple[int, ...]:
+        return tuple(edge.target for edge in self.out_edges(node_id, label))
+
+    def in_neighbors(self, node_id: int, label: str | None = None) -> tuple[int, ...]:
+        return tuple(edge.source for edge in self.in_edges(node_id, label))
+
     def has_edge(self, source: int, target: int, label: str) -> bool:
         return any(
             edge.target == target and edge.label == label
             for edge in self._out_edges[source]
         )
-

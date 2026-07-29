@@ -1,0 +1,348 @@
+"""Representation comparison against a fixed CausalMotifs-style dictionary.
+
+The fixed baseline receives the complete one-hot basis for the number of
+treated neighbors in an untyped open triad. CausalScope discovers edge-typed
+one-hop patterns from the property graph schema. The data-generating process
+assigns opposite spillover effects to FRIEND and WORKS_WITH neighbors, making
+the conditional mean zero for every untyped treatment-count category.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import random
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from causalscope.generation import generate_one_hop_treated_patterns
+from causalscope.graph import PropertyGraph
+from causalscope.matching import exposure_vector
+from causalscope.pattern import RootedPattern
+from causalscope.randomization import BernoulliDesign
+from causalscope.search import (
+    brute_force_adjusted_p_values,
+    randomization_max_search,
+)
+from causalscope.statistics import (
+    center_outcomes_within_treatment,
+    linear_statistic,
+    max_t_adjusted_p,
+)
+
+FRIEND_PATTERN = "User-[FRIEND]->User:z=1"
+WORK_PATTERN = "User-[WORKS_WITH]->User:z=1"
+MOTIF_FEATURES = ("treated_count=0", "treated_count=1", "treated_count=2")
+
+
+@dataclass(frozen=True)
+class TrialResult:
+    causalscope_any: bool
+    causalscope_both: bool
+    fixed_motifs_any: bool
+    oracle_typed_any: bool
+    pruning_fraction: float
+
+
+@dataclass(frozen=True)
+class MethodSummary:
+    rejection_rate: float
+    standard_error: float
+
+
+def build_typed_star_transactions(
+    focal_count: int,
+) -> tuple[PropertyGraph, tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    """Give every focal user one FRIEND and one WORKS_WITH alter."""
+
+    graph = PropertyGraph()
+    total_nodes = 3 * focal_count
+    for node_id in range(total_nodes):
+        graph.add_node(node_id, "User")
+
+    focal = tuple(range(focal_count))
+    friends: list[int] = []
+    coworkers: list[int] = []
+    for unit in focal:
+        friend = focal_count + 2 * unit
+        coworker = friend + 1
+        friends.append(friend)
+        coworkers.append(coworker)
+        graph.add_edge(unit, friend, "FRIEND")
+        graph.add_edge(unit, coworker, "WORKS_WITH")
+    return graph, focal, tuple(friends), tuple(coworkers)
+
+
+def count_feature_vectors(
+    assignment: tuple[int, ...],
+    friends: tuple[int, ...],
+    coworkers: tuple[int, ...],
+) -> tuple[tuple[bool, ...], ...]:
+    counts = tuple(
+        assignment[friend] + assignment[coworker]
+        for friend, coworker in zip(friends, coworkers)
+    )
+    return tuple(
+        tuple(count == target for count in counts)
+        for target in range(3)
+    )
+
+
+def typed_feature_vectors(
+    assignment: tuple[int, ...],
+    friends: tuple[int, ...],
+    coworkers: tuple[int, ...],
+) -> tuple[tuple[bool, ...], tuple[bool, ...]]:
+    return (
+        tuple(bool(assignment[node]) for node in friends),
+        tuple(bool(assignment[node]) for node in coworkers),
+    )
+
+
+def feature_family_maxima(
+    assignments: tuple[tuple[int, ...], ...],
+    residuals: tuple[float, ...],
+    feature_provider: object,
+) -> tuple[float, ...]:
+    provider = feature_provider
+    return tuple(
+        max(
+            linear_statistic(residuals, feature)
+            for feature in provider(assignment)  # type: ignore[operator]
+        )
+        for assignment in assignments
+    )
+
+
+def any_adjusted_rejection(
+    observed_features: tuple[tuple[bool, ...], ...],
+    residuals: tuple[float, ...],
+    maxima: tuple[float, ...],
+    alpha: float,
+) -> bool:
+    return any(
+        max_t_adjusted_p(linear_statistic(residuals, feature), maxima) <= alpha
+        for feature in observed_features
+    )
+
+
+def run_trial(
+    *,
+    seed: int,
+    focal_count: int,
+    randomizations: int,
+    alpha: float,
+    spillover: float,
+    direct_effect: float,
+    noise_sd: float,
+) -> TrialResult:
+    graph, focal, friends, coworkers = build_typed_star_transactions(focal_count)
+    family = generate_one_hop_treated_patterns(graph, root_label="User")
+    design = BernoulliDesign.constant(len(graph.node_ids), 0.5)
+    rng = random.Random(seed)
+    observed = design.sample(rng)
+
+    outcomes = [0.0] * len(graph.node_ids)
+    for unit, friend, coworker in zip(focal, friends, coworkers):
+        typed_spillover = spillover * (
+            observed[coworker] - observed[friend]
+        )
+        outcomes[unit] = (
+            direct_effect * observed[unit]
+            + typed_spillover
+            + rng.gauss(0.0, noise_sd)
+        )
+    residuals = center_outcomes_within_treatment(
+        tuple(outcomes),
+        observed,
+        focal,
+    )
+    assignments = design.conditional_samples(
+        observed,
+        focal,
+        draws=randomizations,
+        seed=seed + 1_000_003,
+    )
+
+    def pattern_exposures(
+        pattern: RootedPattern,
+        assignment: tuple[int, ...],
+    ) -> tuple[bool, ...]:
+        return exposure_vector(graph, pattern, focal, assignment)
+
+    search = randomization_max_search(
+        family,
+        assignments,
+        residuals,
+        pattern_exposures,
+    )
+    pattern_p = brute_force_adjusted_p_values(
+        family,
+        observed,
+        residuals,
+        pattern_exposures,
+        search.maxima,
+    )
+    signal_rejections = (
+        pattern_p[FRIEND_PATTERN] <= alpha,
+        pattern_p[WORK_PATTERN] <= alpha,
+    )
+
+    def fixed_provider(
+        assignment: tuple[int, ...],
+    ) -> tuple[tuple[bool, ...], ...]:
+        return count_feature_vectors(assignment, friends, coworkers)
+
+    fixed_maxima = feature_family_maxima(
+        assignments,
+        residuals,
+        fixed_provider,
+    )
+    fixed_rejection = any_adjusted_rejection(
+        fixed_provider(observed),
+        residuals,
+        fixed_maxima,
+        alpha,
+    )
+
+    def oracle_provider(
+        assignment: tuple[int, ...],
+    ) -> tuple[tuple[bool, ...], ...]:
+        return typed_feature_vectors(assignment, friends, coworkers)
+
+    oracle_maxima = feature_family_maxima(
+        assignments,
+        residuals,
+        oracle_provider,
+    )
+    oracle_rejection = any_adjusted_rejection(
+        oracle_provider(observed),
+        residuals,
+        oracle_maxima,
+        alpha,
+    )
+
+    exhaustive_evaluations = randomizations * len(family.patterns)
+    return TrialResult(
+        causalscope_any=any(signal_rejections),
+        causalscope_both=all(signal_rejections),
+        fixed_motifs_any=fixed_rejection,
+        oracle_typed_any=oracle_rejection,
+        pruning_fraction=1.0 - search.statistic_evaluations / exhaustive_evaluations,
+    )
+
+
+def summarize_binary(values: list[bool]) -> MethodSummary:
+    rate = sum(values) / len(values)
+    standard_error = math.sqrt(rate * (1.0 - rate) / len(values))
+    return MethodSummary(rate, standard_error)
+
+
+def summarize_trials(trials: list[TrialResult]) -> dict[str, object]:
+    return {
+        "CausalScope-any": asdict(
+            summarize_binary([trial.causalscope_any for trial in trials])
+        ),
+        "CausalScope-both": asdict(
+            summarize_binary([trial.causalscope_both for trial in trials])
+        ),
+        "CausalMotifs-fixed": asdict(
+            summarize_binary([trial.fixed_motifs_any for trial in trials])
+        ),
+        "Oracle-typed": asdict(
+            summarize_binary([trial.oracle_typed_any for trial in trials])
+        ),
+        "mean_pruning_fraction": sum(
+            trial.pruning_fraction for trial in trials
+        )
+        / len(trials),
+    }
+
+
+def run_experiment(args: argparse.Namespace) -> dict[str, object]:
+    scenarios = {
+        "null": 0.0,
+        "hidden_typed_spillover": args.spillover,
+    }
+    results: dict[str, object] = {
+        "config": {
+            "repetitions": args.repetitions,
+            "focal_count": args.focal_count,
+            "randomizations": args.randomizations,
+            "alpha": args.alpha,
+            "spillover": args.spillover,
+            "direct_effect": args.direct_effect,
+            "noise_sd": args.noise_sd,
+            "seed": args.seed,
+        }
+    }
+    for scenario_index, (scenario, spillover) in enumerate(scenarios.items()):
+        trials = [
+            run_trial(
+                seed=args.seed + scenario_index * 1_000_000 + repetition,
+                focal_count=args.focal_count,
+                randomizations=args.randomizations,
+                alpha=args.alpha,
+                spillover=spillover,
+                direct_effect=args.direct_effect,
+                noise_sd=args.noise_sd,
+            )
+            for repetition in range(args.repetitions)
+        ]
+        results[scenario] = summarize_trials(trials)
+    return results
+
+
+def print_results(results: dict[str, object]) -> None:
+    print("CausalScope typed-edge representation benchmark")
+    print(json.dumps(results["config"], indent=2, sort_keys=True))
+    for scenario in ("null", "hidden_typed_spillover"):
+        print(f"\n{scenario}")
+        summary = results[scenario]
+        assert isinstance(summary, dict)
+        for method in (
+            "CausalScope-any",
+            "CausalScope-both",
+            "CausalMotifs-fixed",
+            "Oracle-typed",
+        ):
+            metric = summary[method]
+            assert isinstance(metric, dict)
+            print(
+                f"  {method:20s} "
+                f"{metric['rejection_rate']:.3f} "
+                f"+/- {metric['standard_error']:.3f}"
+            )
+        print(f"  mean pruning fraction {summary['mean_pruning_fraction']:.3f}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repetitions", type=int, default=100)
+    parser.add_argument("--focal-count", type=int, default=80)
+    parser.add_argument("--randomizations", type=int, default=199)
+    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--spillover", type=float, default=1.5)
+    parser.add_argument("--direct-effect", type=float, default=1.0)
+    parser.add_argument("--noise-sd", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=20260730)
+    parser.add_argument("--output", type=Path)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    results = run_experiment(args)
+    print_results(results)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(results, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+
+if __name__ == "__main__":
+    main()
+

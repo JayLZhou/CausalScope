@@ -150,3 +150,37 @@ CausalScope should be described as better only if the experiments establish:
 If criterion 5 fails, the paper should claim a validity and automation
 advantage, not universal statistical dominance.
 
+## First executable comparison
+
+`benchmarks/typed_edge_experiment.py` implements the representation comparison
+before the full official-code replication.
+
+Every focal unit has exactly one `FRIEND` neighbor and one `WORKS_WITH`
+neighbor. The spillover response is
+
+```text
+beta * (Z_work - Z_friend).
+```
+
+The fixed CausalMotifs-style baseline receives one-hot features for every
+possible untyped treated-neighbor count. Conditional on count zero, one, or
+two, its expected spillover response is zero. CausalScope reads the edge types
+from the property graph and automatically generates the two typed patterns.
+
+With 100 repeated experiments, 80 focal units, 199 randomizations, and
+`alpha=0.05`, the checked-in run produced:
+
+| Scenario | CausalScope any | CausalScope both | Fixed motifs any | Typed oracle |
+|---|---:|---:|---:|---:|
+| No spillover | 0.05 | 0.00 | 0.02 | 0.05 |
+| Hidden typed spillover | 1.00 | 0.99 | 0.07 | 1.00 |
+
+This result establishes the intended behavior on one synthetic design:
+CausalScope matches the typed oracle, controls null rejection at the requested
+level, and finds a signal that is absent from the fixed untyped motif
+representation.
+
+It does not yet establish a universal advantage over the official WWW
+algorithm. The next comparison must run the authors' `causalPartition` code on
+the in-dictionary dyad/triad data-generating processes and compare regime
+recovery and Hajek effect error.
