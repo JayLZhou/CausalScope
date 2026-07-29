@@ -1,6 +1,7 @@
 {
   "config": {
     "alpha": 0.05,
+    "decoy_relations": 0,
     "direct_effect": 1.0,
     "focal_count": 80,
     "noise_sd": 1.0,
@@ -18,9 +19,17 @@
       "rejection_rate": 1.0,
       "standard_error": 0.0
     },
+    "CausalScope-any-report": {
+      "rejection_rate": 1.0,
+      "standard_error": 0.0
+    },
     "CausalScope-both": {
       "rejection_rate": 0.99,
       "standard_error": 0.009949874371066205
+    },
+    "CausalScope-decoy-any": {
+      "rejection_rate": 0.0,
+      "standard_error": 0.0
     },
     "Oracle-typed": {
       "rejection_rate": 1.0,
@@ -37,7 +46,15 @@
       "rejection_rate": 0.05,
       "standard_error": 0.021794494717703367
     },
+    "CausalScope-any-report": {
+      "rejection_rate": 0.05,
+      "standard_error": 0.021794494717703367
+    },
     "CausalScope-both": {
+      "rejection_rate": 0.0,
+      "standard_error": 0.0
+    },
+    "CausalScope-decoy-any": {
       "rejection_rate": 0.0,
       "standard_error": 0.0
     },

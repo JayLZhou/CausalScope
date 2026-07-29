@@ -150,6 +150,44 @@ CausalScope should be described as better only if the experiments establish:
 If criterion 5 fails, the paper should claim a validity and automation
 advantage, not universal statistical dominance.
 
+## Why the specified motif must be stronger
+
+There are two different comparisons and they must not be conflated:
+
+1. **Misspecified WWW dictionary:** the true structural motif is absent. An
+   automatic structural miner can have much higher power because it searches a
+   richer representation.
+2. **Correctly specified WWW dictionary:** the true motif is supplied by the
+   analyst. This is an oracle comparison. Automatic mining pays for searching
+   irrelevant alternatives and should not be claimed to beat the oracle.
+
+The second statement has an exact maxT argument in the representation-matched
+experiment. Let `H_oracle` be the two true motifs and
+`H_oracle subset H_auto`. For every randomization assignment `z_b`,
+
+```text
+M_auto(b) = max_{P in H_auto} T_P(z_b)
+          >= max_{P in H_oracle} T_P(z_b)
+          = M_oracle(b).
+```
+
+For either true motif `P`, this implies
+
+```text
+p_auto(P) >= p_oracle(P).
+```
+
+Thus an automatic true-motif rejection implies an oracle rejection in every
+paired trial. The relevant metric is **oracle regret**,
+
+```text
+R(beta, D) = Power_oracle(beta) - Power_auto(beta, D),
+```
+
+where `D` is the number of irrelevant candidate relations. A good automatic
+miner makes this gap small at practically relevant effect sizes; it does not
+reverse the inequality.
+
 ## First executable comparison
 
 `benchmarks/typed_edge_experiment.py` implements the representation comparison
@@ -175,12 +213,41 @@ With 100 repeated experiments, 80 focal units, 199 randomizations, and
 | No spillover | 0.05 | 0.00 | 0.02 | 0.05 |
 | Hidden typed spillover | 1.00 | 0.99 | 0.07 | 1.00 |
 
-This result establishes the intended behavior on one synthetic design:
-CausalScope matches the typed oracle, controls null rejection at the requested
-level, and finds a signal that is absent from the fixed untyped motif
-representation.
+At `beta=1.5`, this result establishes that both the automatic search and
+typed oracle have reached the ceiling while the signal remains absent from the
+fixed untyped motif representation. It does not show that automatic discovery
+is cost-free.
 
 It does not yet establish a universal advantage over the official WWW
 algorithm. The next comparison must run the authors' `causalPartition` code on
 the in-dictionary dyad/triad data-generating processes and compare regime
 recovery and Hajek effect error.
+
+## Oracle-gap power curve
+
+`benchmarks/oracle_power_curve.py` adds 20 zero-effect typed relations to the
+two data-generating relations. CausalScope discovers and tests all 22 relation
+patterns, whereas the oracle receives only the two correct ones. With 100
+repetitions, 80 focal units, 199 randomizations, and `alpha=0.05`:
+
+| Spillover `beta` | Automatic true-motif power | Specified-oracle power | Oracle regret | Fixed-untyped rejection |
+|---:|---:|---:|---:|---:|
+| 0.00 | 0.01 | 0.05 | 0.04 | 0.05 |
+| 0.25 | 0.07 | 0.22 | 0.15 | 0.05 |
+| 0.50 | 0.27 | 0.73 | 0.46 | 0.06 |
+| 0.75 | 0.76 | 0.95 | 0.19 | 0.06 |
+| 1.00 | 0.96 | 1.00 | 0.04 | 0.05 |
+| 1.25 | 1.00 | 1.00 | 0.00 | 0.05 |
+| 1.50 | 1.00 | 1.00 | 0.00 | 0.04 |
+
+This is the expected result: the specified oracle leads at weak and moderate
+signals, while automatic mining approaches it as the signal becomes strong.
+The fixed untyped dictionary remains near the nominal level because the
+opposite typed effects cancel after conditioning on total treated-neighbor
+count.
+
+This oracle is still a shared-inference representation control, not the
+official WWW regression tree. It answers whether automatic motif generation
+recovers a motif that an analyst could have named in advance. It does not yet
+answer whether the complete CausalScope pipeline outperforms the authors'
+effect-estimation procedure.

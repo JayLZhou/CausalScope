@@ -1,10 +1,12 @@
-"""Representation comparison against a fixed CausalMotifs-style dictionary.
+"""Representation comparison against fixed and oracle motif dictionaries.
 
 The fixed baseline receives the complete one-hot basis for the number of
 treated neighbors in an untyped open triad. CausalScope discovers edge-typed
-one-hop patterns from the property graph schema. The data-generating process
-assigns opposite spillover effects to FRIEND and WORKS_WITH neighbors, making
-the conditional mean zero for every untyped treatment-count category.
+one-hop patterns from the property graph schema, including any causally
+irrelevant decoy edge types. The oracle is handed the two true typed motifs.
+The data-generating process assigns opposite spillover effects to FRIEND and
+WORKS_WITH neighbors, making the conditional mean zero for every untyped
+treatment-count category.
 """
 
 from __future__ import annotations
@@ -13,12 +15,12 @@ import argparse
 import json
 import math
 import random
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from causalscope.generation import generate_one_hop_treated_patterns
 from causalscope.graph import PropertyGraph
-from causalscope.matching import exposure_vector
 from causalscope.pattern import RootedPattern
 from causalscope.randomization import BernoulliDesign
 from causalscope.search import (
@@ -33,13 +35,15 @@ from causalscope.statistics import (
 
 FRIEND_PATTERN = "User-[FRIEND]->User:z=1"
 WORK_PATTERN = "User-[WORKS_WITH]->User:z=1"
-MOTIF_FEATURES = ("treated_count=0", "treated_count=1", "treated_count=2")
+ROOT_PATTERN = "root:User"
 
 
 @dataclass(frozen=True)
 class TrialResult:
     causalscope_any: bool
     causalscope_both: bool
+    causalscope_report_any: bool
+    causalscope_decoy_any: bool
     fixed_motifs_any: bool
     oracle_typed_any: bool
     pruning_fraction: float
@@ -53,63 +57,90 @@ class MethodSummary:
 
 def build_typed_star_transactions(
     focal_count: int,
-) -> tuple[PropertyGraph, tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
-    """Give every focal user one FRIEND and one WORKS_WITH alter."""
+    decoy_relations: int = 0,
+) -> tuple[PropertyGraph, tuple[int, ...], dict[str, tuple[int, ...]]]:
+    """Give every focal one alter of each true and decoy relation type."""
+
+    if focal_count <= 0:
+        raise ValueError("focal_count must be positive")
+    if decoy_relations < 0:
+        raise ValueError("decoy_relations must be nonnegative")
 
     graph = PropertyGraph()
-    total_nodes = 3 * focal_count
+    relation_labels = (
+        "FRIEND",
+        "WORKS_WITH",
+        *(f"DECOY_{index:02d}" for index in range(decoy_relations)),
+    )
+    nodes_per_focal = 1 + len(relation_labels)
+    total_nodes = nodes_per_focal * focal_count
     for node_id in range(total_nodes):
         graph.add_node(node_id, "User")
 
     focal = tuple(range(focal_count))
-    friends: list[int] = []
-    coworkers: list[int] = []
+    alters_by_relation: dict[str, list[int]] = {
+        label: [] for label in relation_labels
+    }
     for unit in focal:
-        friend = focal_count + 2 * unit
-        coworker = friend + 1
-        friends.append(friend)
-        coworkers.append(coworker)
-        graph.add_edge(unit, friend, "FRIEND")
-        graph.add_edge(unit, coworker, "WORKS_WITH")
-    return graph, focal, tuple(friends), tuple(coworkers)
+        first_alter = focal_count + len(relation_labels) * unit
+        for offset, label in enumerate(relation_labels):
+            alter = first_alter + offset
+            alters_by_relation[label].append(alter)
+            graph.add_edge(unit, alter, label)
+    return (
+        graph,
+        focal,
+        {
+            label: tuple(alters)
+            for label, alters in alters_by_relation.items()
+        },
+    )
 
 
 def count_feature_vectors(
     assignment: tuple[int, ...],
-    friends: tuple[int, ...],
-    coworkers: tuple[int, ...],
+    alters_by_relation: Mapping[str, tuple[int, ...]],
 ) -> tuple[tuple[bool, ...], ...]:
+    alters_by_focal = zip(*alters_by_relation.values())
     counts = tuple(
-        assignment[friend] + assignment[coworker]
-        for friend, coworker in zip(friends, coworkers)
+        sum(assignment[alter] for alter in alters)
+        for alters in alters_by_focal
     )
+    neighbor_count = len(alters_by_relation)
     return tuple(
         tuple(count == target for count in counts)
-        for target in range(3)
+        for target in range(neighbor_count + 1)
     )
 
 
 def typed_feature_vectors(
     assignment: tuple[int, ...],
-    friends: tuple[int, ...],
-    coworkers: tuple[int, ...],
+    alters_by_relation: Mapping[str, tuple[int, ...]],
 ) -> tuple[tuple[bool, ...], tuple[bool, ...]]:
     return (
-        tuple(bool(assignment[node]) for node in friends),
-        tuple(bool(assignment[node]) for node in coworkers),
+        tuple(
+            bool(assignment[node])
+            for node in alters_by_relation["FRIEND"]
+        ),
+        tuple(
+            bool(assignment[node])
+            for node in alters_by_relation["WORKS_WITH"]
+        ),
     )
 
 
 def feature_family_maxima(
     assignments: tuple[tuple[int, ...], ...],
     residuals: tuple[float, ...],
-    feature_provider: object,
+    feature_provider: Callable[
+        [tuple[int, ...]],
+        tuple[tuple[bool, ...], ...],
+    ],
 ) -> tuple[float, ...]:
-    provider = feature_provider
     return tuple(
         max(
             linear_statistic(residuals, feature)
-            for feature in provider(assignment)  # type: ignore[operator]
+            for feature in feature_provider(assignment)
         )
         for assignment in assignments
     )
@@ -136,15 +167,23 @@ def run_trial(
     spillover: float,
     direct_effect: float,
     noise_sd: float,
+    decoy_relations: int = 0,
 ) -> TrialResult:
-    graph, focal, friends, coworkers = build_typed_star_transactions(focal_count)
+    graph, focal, alters_by_relation = build_typed_star_transactions(
+        focal_count,
+        decoy_relations,
+    )
     family = generate_one_hop_treated_patterns(graph, root_label="User")
     design = BernoulliDesign.constant(len(graph.node_ids), 0.5)
     rng = random.Random(seed)
     observed = design.sample(rng)
 
     outcomes = [0.0] * len(graph.node_ids)
-    for unit, friend, coworker in zip(focal, friends, coworkers):
+    for unit, friend, coworker in zip(
+        focal,
+        alters_by_relation["FRIEND"],
+        alters_by_relation["WORKS_WITH"],
+    ):
         typed_spillover = spillover * (
             observed[coworker] - observed[friend]
         )
@@ -169,7 +208,13 @@ def run_trial(
         pattern: RootedPattern,
         assignment: tuple[int, ...],
     ) -> tuple[bool, ...]:
-        return exposure_vector(graph, pattern, focal, assignment)
+        if pattern.name == ROOT_PATTERN:
+            return (True,) * len(focal)
+        edge_label = pattern.edges[0].label
+        return tuple(
+            bool(assignment[node])
+            for node in alters_by_relation[edge_label]
+        )
 
     search = randomization_max_search(
         family,
@@ -184,6 +229,12 @@ def run_trial(
         pattern_exposures,
         search.maxima,
     )
+    reportable_names = tuple(
+        name for name in family.depth_first_names() if name != ROOT_PATTERN
+    )
+    decoy_names = tuple(
+        name for name in reportable_names if "DECOY_" in name
+    )
     signal_rejections = (
         pattern_p[FRIEND_PATTERN] <= alpha,
         pattern_p[WORK_PATTERN] <= alpha,
@@ -192,7 +243,7 @@ def run_trial(
     def fixed_provider(
         assignment: tuple[int, ...],
     ) -> tuple[tuple[bool, ...], ...]:
-        return count_feature_vectors(assignment, friends, coworkers)
+        return count_feature_vectors(assignment, alters_by_relation)
 
     fixed_maxima = feature_family_maxima(
         assignments,
@@ -209,7 +260,7 @@ def run_trial(
     def oracle_provider(
         assignment: tuple[int, ...],
     ) -> tuple[tuple[bool, ...], ...]:
-        return typed_feature_vectors(assignment, friends, coworkers)
+        return typed_feature_vectors(assignment, alters_by_relation)
 
     oracle_maxima = feature_family_maxima(
         assignments,
@@ -222,11 +273,23 @@ def run_trial(
         oracle_maxima,
         alpha,
     )
+    automatic_signal_rejection = any(signal_rejections)
+    if automatic_signal_rejection and not oracle_rejection:
+        raise AssertionError(
+            "a superset maxT search cannot reject a true motif that its "
+            "specified-motif subset does not reject"
+        )
 
     exhaustive_evaluations = randomizations * len(family.patterns)
     return TrialResult(
-        causalscope_any=any(signal_rejections),
+        causalscope_any=automatic_signal_rejection,
         causalscope_both=all(signal_rejections),
+        causalscope_report_any=any(
+            pattern_p[name] <= alpha for name in reportable_names
+        ),
+        causalscope_decoy_any=any(
+            pattern_p[name] <= alpha for name in decoy_names
+        ),
         fixed_motifs_any=fixed_rejection,
         oracle_typed_any=oracle_rejection,
         pruning_fraction=1.0 - search.statistic_evaluations / exhaustive_evaluations,
@@ -246,6 +309,16 @@ def summarize_trials(trials: list[TrialResult]) -> dict[str, object]:
         ),
         "CausalScope-both": asdict(
             summarize_binary([trial.causalscope_both for trial in trials])
+        ),
+        "CausalScope-any-report": asdict(
+            summarize_binary(
+                [trial.causalscope_report_any for trial in trials]
+            )
+        ),
+        "CausalScope-decoy-any": asdict(
+            summarize_binary(
+                [trial.causalscope_decoy_any for trial in trials]
+            )
         ),
         "CausalMotifs-fixed": asdict(
             summarize_binary([trial.fixed_motifs_any for trial in trials])
@@ -274,6 +347,7 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
             "spillover": args.spillover,
             "direct_effect": args.direct_effect,
             "noise_sd": args.noise_sd,
+            "decoy_relations": args.decoy_relations,
             "seed": args.seed,
         }
     }
@@ -287,6 +361,7 @@ def run_experiment(args: argparse.Namespace) -> dict[str, object]:
                 spillover=spillover,
                 direct_effect=args.direct_effect,
                 noise_sd=args.noise_sd,
+                decoy_relations=args.decoy_relations,
             )
             for repetition in range(args.repetitions)
         ]
@@ -304,6 +379,8 @@ def print_results(results: dict[str, object]) -> None:
         for method in (
             "CausalScope-any",
             "CausalScope-both",
+            "CausalScope-any-report",
+            "CausalScope-decoy-any",
             "CausalMotifs-fixed",
             "Oracle-typed",
         ):
@@ -326,6 +403,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spillover", type=float, default=1.5)
     parser.add_argument("--direct-effect", type=float, default=1.0)
     parser.add_argument("--noise-sd", type=float, default=1.0)
+    parser.add_argument("--decoy-relations", type=int, default=0)
     parser.add_argument("--seed", type=int, default=20260730)
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
@@ -345,4 +423,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

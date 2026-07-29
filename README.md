@@ -63,3 +63,9 @@ Motifs* (WWW 2021). See
 claim boundary and the experiments required to establish an empirical
 advantage without overstating the current prototype.
 
+The executable
+[oracle-gap benchmark](benchmarks/README.md#specified-oracle-versus-automatic-mining)
+compares automatic search over 22 typed motifs with an oracle given the two
+correct motifs and a misspecified untyped dictionary. It makes the statistical
+cost of automatic discovery explicit rather than hiding it at a saturated
+effect size.
