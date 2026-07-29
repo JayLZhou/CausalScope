@@ -1,12 +1,12 @@
-"""Representation comparison against fixed and oracle motif dictionaries.
+"""Representation comparison against fixed and hand-specified motif sets.
 
 The fixed baseline receives the complete one-hot basis for the number of
 treated neighbors in an untyped open triad. CausalScope discovers edge-typed
 one-hop patterns from the property graph schema, including any causally
-irrelevant decoy edge types. The oracle is handed the two true typed motifs.
-The data-generating process assigns opposite spillover effects to FRIEND and
-WORKS_WITH neighbors, making the conditional mean zero for every untyped
-treatment-count category.
+irrelevant decoy edge types. The hand-specified control is given the two true
+typed motifs. The data-generating process assigns opposite spillover effects
+to FRIEND and WORKS_WITH neighbors, making the conditional mean zero for every
+untyped treatment-count category.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from causalscope.pattern import RootedPattern
 from causalscope.randomization import BernoulliDesign
 from causalscope.search import (
     brute_force_adjusted_p_values,
+    brute_force_randomization_maxima,
     randomization_max_search,
 )
 from causalscope.statistics import (
@@ -45,13 +46,24 @@ class TrialResult:
     causalscope_report_any: bool
     causalscope_decoy_any: bool
     fixed_motifs_any: bool
-    oracle_typed_any: bool
+    specified_typed_any: bool
+    causalscope_objective: float
+    specified_typed_objective: float
+    fixed_untyped_objective: float
+    causalscope_true_maximizer: bool
+    exact_observed_maximum: bool
     pruning_fraction: float
 
 
 @dataclass(frozen=True)
 class MethodSummary:
     rejection_rate: float
+    standard_error: float
+
+
+@dataclass(frozen=True)
+class ContinuousSummary:
+    mean: float
     standard_error: float
 
 
@@ -239,6 +251,35 @@ def run_trial(
         pattern_p[FRIEND_PATTERN] <= alpha,
         pattern_p[WORK_PATTERN] <= alpha,
     )
+    observed_search = randomization_max_search(
+        family,
+        (observed,),
+        residuals,
+        pattern_exposures,
+    )
+    observed_brute = brute_force_randomization_maxima(
+        family,
+        (observed,),
+        residuals,
+        pattern_exposures,
+    )
+    exact_observed_maximum = observed_search.maxima == observed_brute
+    if not exact_observed_maximum:
+        raise AssertionError("pruned observed maximum differs from exhaustive")
+    automatic_objective = observed_search.maxima[0] / focal_count
+    pattern_scores = {
+        name: linear_statistic(
+            residuals,
+            pattern_exposures(family.patterns[name], observed),
+        )
+        / focal_count
+        for name in reportable_names
+    }
+    best_score = max(pattern_scores.values())
+    true_maximizer = any(
+        math.isclose(pattern_scores[name], best_score)
+        for name in (FRIEND_PATTERN, WORK_PATTERN)
+    )
 
     def fixed_provider(
         assignment: tuple[int, ...],
@@ -256,25 +297,38 @@ def run_trial(
         fixed_maxima,
         alpha,
     )
+    fixed_objective = max(
+        linear_statistic(residuals, feature)
+        for feature in fixed_provider(observed)
+    ) / focal_count
 
-    def oracle_provider(
+    def specified_provider(
         assignment: tuple[int, ...],
     ) -> tuple[tuple[bool, ...], ...]:
         return typed_feature_vectors(assignment, alters_by_relation)
 
-    oracle_maxima = feature_family_maxima(
+    specified_maxima = feature_family_maxima(
         assignments,
         residuals,
-        oracle_provider,
+        specified_provider,
     )
-    oracle_rejection = any_adjusted_rejection(
-        oracle_provider(observed),
+    specified_rejection = any_adjusted_rejection(
+        specified_provider(observed),
         residuals,
-        oracle_maxima,
+        specified_maxima,
         alpha,
     )
+    specified_objective = max(
+        linear_statistic(residuals, feature)
+        for feature in specified_provider(observed)
+    ) / focal_count
+    if automatic_objective + 1e-12 < specified_objective:
+        raise AssertionError(
+            "the automatic candidate superset has a smaller objective "
+            "than its hand-specified subset"
+        )
     automatic_signal_rejection = any(signal_rejections)
-    if automatic_signal_rejection and not oracle_rejection:
+    if automatic_signal_rejection and not specified_rejection:
         raise AssertionError(
             "a superset maxT search cannot reject a true motif that its "
             "specified-motif subset does not reject"
@@ -291,7 +345,12 @@ def run_trial(
             pattern_p[name] <= alpha for name in decoy_names
         ),
         fixed_motifs_any=fixed_rejection,
-        oracle_typed_any=oracle_rejection,
+        specified_typed_any=specified_rejection,
+        causalscope_objective=automatic_objective,
+        specified_typed_objective=specified_objective,
+        fixed_untyped_objective=fixed_objective,
+        causalscope_true_maximizer=true_maximizer,
+        exact_observed_maximum=exact_observed_maximum,
         pruning_fraction=1.0 - search.statistic_evaluations / exhaustive_evaluations,
     )
 
@@ -300,6 +359,12 @@ def summarize_binary(values: list[bool]) -> MethodSummary:
     rate = sum(values) / len(values)
     standard_error = math.sqrt(rate * (1.0 - rate) / len(values))
     return MethodSummary(rate, standard_error)
+
+
+def summarize_continuous(values: list[float]) -> ContinuousSummary:
+    mean = sum(values) / len(values)
+    variance = sum((value - mean) ** 2 for value in values) / len(values)
+    return ContinuousSummary(mean, math.sqrt(variance / len(values)))
 
 
 def summarize_trials(trials: list[TrialResult]) -> dict[str, object]:
@@ -320,11 +385,36 @@ def summarize_trials(trials: list[TrialResult]) -> dict[str, object]:
                 [trial.causalscope_decoy_any for trial in trials]
             )
         ),
-        "CausalMotifs-fixed": asdict(
+        "Fixed-untyped": asdict(
             summarize_binary([trial.fixed_motifs_any for trial in trials])
         ),
-        "Oracle-typed": asdict(
-            summarize_binary([trial.oracle_typed_any for trial in trials])
+        "Hand-specified-correct": asdict(
+            summarize_binary([trial.specified_typed_any for trial in trials])
+        ),
+        "CausalScope-objective": asdict(
+            summarize_continuous(
+                [trial.causalscope_objective for trial in trials]
+            )
+        ),
+        "Hand-specified-objective": asdict(
+            summarize_continuous(
+                [trial.specified_typed_objective for trial in trials]
+            )
+        ),
+        "Fixed-untyped-objective": asdict(
+            summarize_continuous(
+                [trial.fixed_untyped_objective for trial in trials]
+            )
+        ),
+        "CausalScope-true-maximizer": asdict(
+            summarize_binary(
+                [trial.causalscope_true_maximizer for trial in trials]
+            )
+        ),
+        "Exact-vs-exhaustive": asdict(
+            summarize_binary(
+                [trial.exact_observed_maximum for trial in trials]
+            )
         ),
         "mean_pruning_fraction": sum(
             trial.pruning_fraction for trial in trials
@@ -381,8 +471,8 @@ def print_results(results: dict[str, object]) -> None:
             "CausalScope-both",
             "CausalScope-any-report",
             "CausalScope-decoy-any",
-            "CausalMotifs-fixed",
-            "Oracle-typed",
+            "Fixed-untyped",
+            "Hand-specified-correct",
         ):
             metric = summary[method]
             assert isinstance(metric, dict)
@@ -390,6 +480,28 @@ def print_results(results: dict[str, object]) -> None:
                 f"  {method:20s} "
                 f"{metric['rejection_rate']:.3f} "
                 f"+/- {metric['standard_error']:.3f}"
+            )
+        for metric_name in (
+            "CausalScope-objective",
+            "Hand-specified-objective",
+            "Fixed-untyped-objective",
+        ):
+            metric = summary[metric_name]
+            assert isinstance(metric, dict)
+            print(
+                f"  {metric_name:25s} "
+                f"{metric['mean']:.3f} "
+                f"+/- {metric['standard_error']:.3f}"
+            )
+        for metric_name in (
+            "CausalScope-true-maximizer",
+            "Exact-vs-exhaustive",
+        ):
+            metric = summary[metric_name]
+            assert isinstance(metric, dict)
+            print(
+                f"  {metric_name:25s} "
+                f"{metric['rejection_rate']:.3f}"
             )
         print(f"  mean pruning fraction {summary['mean_pruning_fraction']:.3f}")
 

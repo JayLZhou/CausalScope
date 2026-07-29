@@ -27,6 +27,12 @@ naive matcher. The next milestone replaces that generator with canonical
 DFS-code growth and projected embedding databases without changing the
 randomization search interface.
 
+The current exposure grammar is binary and existential. It does not yet
+subsume Causal Network Motifs' normalized motif-count and ratio features.
+Consequently, the current common-objective dominance result applies to a
+correctly hand-specified binary-pattern subset, not to the complete WWW
+algorithm.
+
 ## Quick start
 
 ```bash
@@ -64,8 +70,9 @@ claim boundary and the experiments required to establish an empirical
 advantage without overstating the current prototype.
 
 The executable
-[oracle-gap benchmark](benchmarks/README.md#specified-oracle-versus-automatic-mining)
-compares automatic search over 22 typed motifs with an oracle given the two
-correct motifs and a misspecified untyped dictionary. It makes the statistical
-cost of automatic discovery explicit rather than hiding it at a saturated
-effect size.
+[objective-recovery benchmark](benchmarks/README.md#exact-objective-and-recovery-curve)
+compares automatic search over 22 typed motifs with a correctly hand-specified
+two-motif subset and a misspecified untyped dictionary. It reports exact
+equality with exhaustive maximization, true-pattern recovery, adjusted power,
+and null error rather than treating a larger raw maximum as sufficient
+evidence.

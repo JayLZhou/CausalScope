@@ -11,10 +11,6 @@
     "spillover": 1.5
   },
   "hidden_typed_spillover": {
-    "CausalMotifs-fixed": {
-      "rejection_rate": 0.07,
-      "standard_error": 0.02551470164434615
-    },
     "CausalScope-any": {
       "rejection_rate": 1.0,
       "standard_error": 0.0
@@ -31,17 +27,37 @@
       "rejection_rate": 0.0,
       "standard_error": 0.0
     },
-    "Oracle-typed": {
+    "CausalScope-objective": {
+      "mean": 0.39809674358828245,
+      "standard_error": 0.006223770588176843
+    },
+    "CausalScope-true-maximizer": {
       "rejection_rate": 1.0,
       "standard_error": 0.0
+    },
+    "Exact-vs-exhaustive": {
+      "rejection_rate": 1.0,
+      "standard_error": 0.0
+    },
+    "Fixed-untyped": {
+      "rejection_rate": 0.07,
+      "standard_error": 0.02551470164434615
+    },
+    "Fixed-untyped-objective": {
+      "mean": 0.08443539709154525,
+      "standard_error": 0.00552645086775886
+    },
+    "Hand-specified-correct": {
+      "rejection_rate": 1.0,
+      "standard_error": 0.0
+    },
+    "Hand-specified-objective": {
+      "mean": 0.39809674358828245,
+      "standard_error": 0.006223770588176843
     },
     "mean_pruning_fraction": 0.00020100502512563235
   },
   "null": {
-    "CausalMotifs-fixed": {
-      "rejection_rate": 0.02,
-      "standard_error": 0.014
-    },
     "CausalScope-any": {
       "rejection_rate": 0.05,
       "standard_error": 0.021794494717703367
@@ -58,9 +74,33 @@
       "rejection_rate": 0.0,
       "standard_error": 0.0
     },
-    "Oracle-typed": {
+    "CausalScope-objective": {
+      "mean": 0.058791645020576044,
+      "standard_error": 0.0032590755710523323
+    },
+    "CausalScope-true-maximizer": {
+      "rejection_rate": 1.0,
+      "standard_error": 0.0
+    },
+    "Exact-vs-exhaustive": {
+      "rejection_rate": 1.0,
+      "standard_error": 0.0
+    },
+    "Fixed-untyped": {
+      "rejection_rate": 0.02,
+      "standard_error": 0.014
+    },
+    "Fixed-untyped-objective": {
+      "mean": 0.062160607111657426,
+      "standard_error": 0.0029110072740179175
+    },
+    "Hand-specified-correct": {
       "rejection_rate": 0.05,
       "standard_error": 0.021794494717703367
+    },
+    "Hand-specified-objective": {
+      "mean": 0.058791645020576044,
+      "standard_error": 0.0032590755710523323
     },
     "mean_pruning_fraction": 5.0251256281408364e-05
   }

@@ -31,6 +31,8 @@ def test_typed_edge_trial_runs_end_to_end() -> None:
     assert isinstance(result.causalscope_report_any, bool)
     assert result.causalscope_decoy_any is False
     assert isinstance(result.fixed_motifs_any, bool)
+    assert result.exact_observed_maximum
+    assert result.causalscope_objective >= result.specified_typed_objective
     assert 0.0 <= result.pruning_fraction <= 1.0
 
 
@@ -66,7 +68,7 @@ def test_typed_edge_trial_includes_automatic_decoy_search() -> None:
     assert isinstance(result.causalscope_decoy_any, bool)
 
 
-def test_automatic_rejection_implies_oracle_rejection() -> None:
+def test_automatic_rejection_implies_specified_rejection() -> None:
     benchmark = load_benchmark_module()
 
     for seed in range(10):
@@ -80,4 +82,4 @@ def test_automatic_rejection_implies_oracle_rejection() -> None:
             noise_sd=1.0,
             decoy_relations=5,
         )
-        assert not result.causalscope_any or result.oracle_typed_any
+        assert not result.causalscope_any or result.specified_typed_any

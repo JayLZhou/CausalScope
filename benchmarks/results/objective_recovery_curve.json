@@ -1,0 +1,380 @@
+{
+  "config": {
+    "alpha": 0.05,
+    "decoy_relations": 20,
+    "direct_effect": 1.0,
+    "effect_sizes": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5
+    ],
+    "focal_count": 80,
+    "noise_sd": 1.0,
+    "randomizations": 199,
+    "repetitions": 100,
+    "seed": 20260730
+  },
+  "rows": [
+    {
+      "automatic_any_report": {
+        "rejection_rate": 0.04,
+        "standard_error": 0.019595917942265423
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.03,
+        "standard_error": 0.01705872210923198
+      },
+      "automatic_minus_fixed_objective": 0.054119889956942835,
+      "automatic_minus_specified_objective": 0.05778809986030256,
+      "automatic_objective": {
+        "mean": 0.11888896407824197,
+        "standard_error": 0.0027942649325701334
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 0.01,
+        "standard_error": 0.0099498743710662
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.0,
+        "standard_error": 0.0
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 0.07,
+        "standard_error": 0.02551470164434615
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.06476907412129913,
+        "standard_error": 0.0021643318633808683
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "hand_specified_objective": {
+        "mean": 0.06110086421793941,
+        "standard_error": 0.003544466768026745
+      },
+      "mean_pruning_fraction": 0.004059427572645839,
+      "specified_minus_automatic_power": 0.04,
+      "spillover": 0.0
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 0.11,
+        "standard_error": 0.03128897569432403
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "automatic_minus_fixed_objective": 0.061454940914657696,
+      "automatic_minus_specified_objective": 0.0331022169688784,
+      "automatic_objective": {
+        "mean": 0.12752700684971427,
+        "standard_error": 0.003445985196885627
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 0.07,
+        "standard_error": 0.02551470164434615
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.0,
+        "standard_error": 0.0
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 0.29,
+        "standard_error": 0.045376205218153706
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.06607206593505657,
+        "standard_error": 0.0021511784521356754
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 0.22,
+        "standard_error": 0.04142463035441596
+      },
+      "hand_specified_objective": {
+        "mean": 0.09442478988083587,
+        "standard_error": 0.0045329713115979066
+      },
+      "mean_pruning_fraction": 0.0041511907362901425,
+      "specified_minus_automatic_power": 0.15,
+      "spillover": 0.25
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 0.3,
+        "standard_error": 0.0458257569495584
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.03,
+        "standard_error": 0.01705872210923198
+      },
+      "automatic_minus_fixed_objective": 0.09164960273644844,
+      "automatic_minus_specified_objective": 0.008326583955068939,
+      "automatic_objective": {
+        "mean": 0.16153810020849416,
+        "standard_error": 0.004285080522374278
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 0.27,
+        "standard_error": 0.044395945760846225
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.0,
+        "standard_error": 0.0
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 0.73,
+        "standard_error": 0.044395945760846225
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.06,
+        "standard_error": 0.023748684174075833
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.06988849747204572,
+        "standard_error": 0.002205604595214835
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 0.73,
+        "standard_error": 0.044395945760846225
+      },
+      "hand_specified_objective": {
+        "mean": 0.15321151625342522,
+        "standard_error": 0.004868737299437322
+      },
+      "mean_pruning_fraction": 0.004181778457504919,
+      "specified_minus_automatic_power": 0.45999999999999996,
+      "spillover": 0.5
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 0.77,
+        "standard_error": 0.042083250825001625
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.03,
+        "standard_error": 0.01705872210923198
+      },
+      "automatic_minus_fixed_objective": 0.1397924897451019,
+      "automatic_minus_specified_objective": 0.001383001242720866,
+      "automatic_objective": {
+        "mean": 0.21483998800427184,
+        "standard_error": 0.004974347765075851
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 0.76,
+        "standard_error": 0.04270831300812525
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.14,
+        "standard_error": 0.03469870314579494
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 0.94,
+        "standard_error": 0.023748684174075843
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.06,
+        "standard_error": 0.023748684174075833
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.07504749825916994,
+        "standard_error": 0.002354158272481764
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 0.95,
+        "standard_error": 0.021794494717703377
+      },
+      "hand_specified_objective": {
+        "mean": 0.21345698676155098,
+        "standard_error": 0.005060432844061329
+      },
+      "mean_pruning_fraction": 0.0041533755735197716,
+      "specified_minus_automatic_power": 0.18999999999999995,
+      "spillover": 0.75
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 0.97,
+        "standard_error": 0.017058722109231986
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.04,
+        "standard_error": 0.019595917942265423
+      },
+      "automatic_minus_fixed_objective": 0.19301366017272764,
+      "automatic_minus_specified_objective": 0.00028547231511838467,
+      "automatic_objective": {
+        "mean": 0.27399294732848206,
+        "standard_error": 0.005286718601720099
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 0.96,
+        "standard_error": 0.019595917942265433
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.53,
+        "standard_error": 0.04990991885387112
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 0.99,
+        "standard_error": 0.009949874371066205
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.08097928715575443,
+        "standard_error": 0.0026690097436318613
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "hand_specified_objective": {
+        "mean": 0.2737074750133637,
+        "standard_error": 0.005313357230465884
+      },
+      "mean_pruning_fraction": 0.0038977496176534876,
+      "specified_minus_automatic_power": 0.040000000000000036,
+      "spillover": 1.0
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.03,
+        "standard_error": 0.01705872210923198
+      },
+      "automatic_minus_fixed_objective": 0.24604439525339988,
+      "automatic_minus_specified_objective": 0.0,
+      "automatic_objective": {
+        "mean": 0.33396466427148946,
+        "standard_error": 0.005619059649308533
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.87,
+        "standard_error": 0.03363034344160047
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.05,
+        "standard_error": 0.021794494717703367
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.0879202690180896,
+        "standard_error": 0.0030584223817791143
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "hand_specified_objective": {
+        "mean": 0.33396466427148946,
+        "standard_error": 0.005619059649308533
+      },
+      "mean_pruning_fraction": 0.0037032991042167352,
+      "specified_minus_automatic_power": 0.0,
+      "spillover": 1.25
+    },
+    {
+      "automatic_any_report": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "automatic_decoy_any": {
+        "rejection_rate": 0.04,
+        "standard_error": 0.019595917942265423
+      },
+      "automatic_minus_fixed_objective": 0.29851675241821307,
+      "automatic_minus_specified_objective": 0.0,
+      "automatic_objective": {
+        "mean": 0.39424244801874264,
+        "standard_error": 0.005968604327645189
+      },
+      "automatic_signal_any": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "automatic_signal_both": {
+        "rejection_rate": 0.99,
+        "standard_error": 0.009949874371066205
+      },
+      "automatic_true_maximizer": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "exact_vs_exhaustive": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "fixed_untyped": {
+        "rejection_rate": 0.04,
+        "standard_error": 0.019595917942265423
+      },
+      "fixed_untyped_objective": {
+        "mean": 0.09572569560052954,
+        "standard_error": 0.003446368742892152
+      },
+      "hand_specified_correct": {
+        "rejection_rate": 1.0,
+        "standard_error": 0.0
+      },
+      "hand_specified_objective": {
+        "mean": 0.39424244801874264,
+        "standard_error": 0.005968604327645189
+      },
+      "mean_pruning_fraction": 0.003683635569150098,
+      "specified_minus_automatic_power": 0.0,
+      "spillover": 1.5
+    }
+  ]
+}

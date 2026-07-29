@@ -1,4 +1,4 @@
-"""Power curve for automatic mining versus specified and misspecified motifs."""
+"""Objective and recovery curve for automatic versus manual motif spaces."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from benchmarks.typed_edge_experiment import (
     run_trial,
     summarize_binary,
+    summarize_continuous,
 )
 
 
@@ -22,7 +23,7 @@ def parse_effect_sizes(raw: str) -> tuple[float, ...]:
     return values
 
 
-def run_power_curve(args: argparse.Namespace) -> dict[str, object]:
+def run_objective_recovery_curve(args: argparse.Namespace) -> dict[str, object]:
     effect_sizes = parse_effect_sizes(args.effect_sizes)
     rows: list[dict[str, object]] = []
 
@@ -52,11 +53,26 @@ def run_power_curve(args: argparse.Namespace) -> dict[str, object]:
         automatic_decoy = summarize_binary(
             [trial.causalscope_decoy_any for trial in trials]
         )
-        oracle = summarize_binary(
-            [trial.oracle_typed_any for trial in trials]
+        specified = summarize_binary(
+            [trial.specified_typed_any for trial in trials]
         )
         misspecified = summarize_binary(
             [trial.fixed_motifs_any for trial in trials]
+        )
+        automatic_objective = summarize_continuous(
+            [trial.causalscope_objective for trial in trials]
+        )
+        specified_objective = summarize_continuous(
+            [trial.specified_typed_objective for trial in trials]
+        )
+        fixed_objective = summarize_continuous(
+            [trial.fixed_untyped_objective for trial in trials]
+        )
+        true_maximizer = summarize_binary(
+            [trial.causalscope_true_maximizer for trial in trials]
+        )
+        exact_equivalence = summarize_binary(
+            [trial.exact_observed_maximum for trial in trials]
         )
         rows.append(
             {
@@ -65,11 +81,22 @@ def run_power_curve(args: argparse.Namespace) -> dict[str, object]:
                 "automatic_signal_both": asdict(automatic_both),
                 "automatic_any_report": asdict(automatic_report),
                 "automatic_decoy_any": asdict(automatic_decoy),
-                "oracle_specified": asdict(oracle),
+                "hand_specified_correct": asdict(specified),
                 "fixed_untyped": asdict(misspecified),
-                "oracle_minus_automatic": (
-                    oracle.rejection_rate - automatic.rejection_rate
+                "specified_minus_automatic_power": (
+                    specified.rejection_rate - automatic.rejection_rate
                 ),
+                "automatic_objective": asdict(automatic_objective),
+                "hand_specified_objective": asdict(specified_objective),
+                "fixed_untyped_objective": asdict(fixed_objective),
+                "automatic_minus_specified_objective": (
+                    automatic_objective.mean - specified_objective.mean
+                ),
+                "automatic_minus_fixed_objective": (
+                    automatic_objective.mean - fixed_objective.mean
+                ),
+                "automatic_true_maximizer": asdict(true_maximizer),
+                "exact_vs_exhaustive": asdict(exact_equivalence),
                 "mean_pruning_fraction": sum(
                     trial.pruning_fraction for trial in trials
                 )
@@ -96,35 +123,40 @@ def run_power_curve(args: argparse.Namespace) -> dict[str, object]:
 def print_results(results: dict[str, object]) -> None:
     config = results["config"]
     assert isinstance(config, dict)
-    print("Oracle-specified versus automatic motif-mining power curve")
+    print("Exact-objective and recovery curve")
     print(json.dumps(config, indent=2, sort_keys=True))
     print(
-        "\n beta | automatic | oracle | oracle gap | fixed | "
-        "any decoy | any report"
+        "\n beta | auto obj | manual obj | fixed obj | true argmax | "
+        "auto power | manual power | exact"
     )
-    print("-" * 75)
+    print("-" * 97)
     rows = results["rows"]
     assert isinstance(rows, list)
     for row in rows:
         assert isinstance(row, dict)
         automatic = row["automatic_signal_any"]
-        oracle = row["oracle_specified"]
-        fixed = row["fixed_untyped"]
-        decoy = row["automatic_decoy_any"]
-        any_report = row["automatic_any_report"]
+        specified = row["hand_specified_correct"]
+        automatic_objective = row["automatic_objective"]
+        specified_objective = row["hand_specified_objective"]
+        fixed_objective = row["fixed_untyped_objective"]
+        true_maximizer = row["automatic_true_maximizer"]
+        exact = row["exact_vs_exhaustive"]
         assert isinstance(automatic, dict)
-        assert isinstance(oracle, dict)
-        assert isinstance(fixed, dict)
-        assert isinstance(decoy, dict)
-        assert isinstance(any_report, dict)
+        assert isinstance(specified, dict)
+        assert isinstance(automatic_objective, dict)
+        assert isinstance(specified_objective, dict)
+        assert isinstance(fixed_objective, dict)
+        assert isinstance(true_maximizer, dict)
+        assert isinstance(exact, dict)
         print(
             f"{row['spillover']:5.2f} |"
-            f" {automatic['rejection_rate']:9.3f} |"
-            f" {oracle['rejection_rate']:6.3f} |"
-            f" {row['oracle_minus_automatic']:10.3f} |"
-            f" {fixed['rejection_rate']:5.3f} |"
-            f" {decoy['rejection_rate']:9.3f} |"
-            f" {any_report['rejection_rate']:10.3f}"
+            f" {automatic_objective['mean']:8.3f} |"
+            f" {specified_objective['mean']:10.3f} |"
+            f" {fixed_objective['mean']:9.3f} |"
+            f" {true_maximizer['rejection_rate']:11.3f} |"
+            f" {automatic['rejection_rate']:10.3f} |"
+            f" {specified['rejection_rate']:12.3f} |"
+            f" {exact['rejection_rate']:5.3f}"
         )
 
 
@@ -148,7 +180,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    results = run_power_curve(args)
+    results = run_objective_recovery_curve(args)
     print_results(results)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -34,7 +34,9 @@ The experiment reports:
 - null familywise rejection rates;
 - power to detect any typed spillover pattern;
 - probability of recovering both typed patterns;
-- a typed-feature oracle upper reference;
+- a correctly hand-specified typed-feature control;
+- normalized maximized causal objectives;
+- true-pattern argmax recovery and exact equality with exhaustive search;
 - the fraction of statistic evaluations avoided by envelope pruning.
 
 ### Reference result
@@ -42,7 +44,7 @@ The experiment reports:
 The checked-in reference run uses 100 repeated experiments, 80 focal units,
 199 conditional randomizations, `alpha=0.05`, and seed `20260730`.
 
-| Scenario | CausalScope any | CausalScope both | Fixed motifs any | Typed oracle |
+| Scenario | CausalScope any | CausalScope both | Fixed motifs any | Hand-specified |
 |---|---:|---:|---:|---:|
 | No spillover | 0.05 | 0.00 | 0.02 | 0.05 |
 | Hidden typed spillover | 1.00 | 0.99 | 0.07 | 1.00 |
@@ -56,17 +58,23 @@ maxT inference as CausalScope and the complete untyped treatment-count basis.
 Its low power in the second row therefore reflects missing edge-type semantics,
 not weaker inference code.
 
-The equality between CausalScope and the typed oracle at `beta=1.5` is a
-ceiling effect. It must not be interpreted as evidence that automatic search
-is as powerful as being told the correct motif.
+The equality between CausalScope and the hand-specified control at `beta=1.5`
+is a ceiling effect. It must not be interpreted as evidence that automatic
+search is as powerful as being told the correct motif.
 
-## Specified oracle versus automatic mining
+## Exact objective and recovery curve
 
-`oracle_power_curve.py` performs the comparison that exposes the cost of
-automatic discovery:
+`objective_recovery_curve.py` separates three questions that the first
+experiment had conflated:
 
-1. `Oracle-specified` is handed exactly `FRIEND` and `WORKS_WITH`, the two
-   data-generating motifs.
+1. Does pruned automatic search return exactly the exhaustive maximum?
+2. Does the larger automatic candidate set attain at least the objective of
+   its correctly hand-specified subset?
+3. Is the maximizer a true causal pattern rather than a high-scoring decoy?
+
+The compared candidate spaces are:
+
+1. `Hand-specified-correct` receives exactly `FRIEND` and `WORKS_WITH`.
 2. `CausalScope-automatic` reads the graph schema and searches those two motifs
    together with 20 causally irrelevant typed relations.
 3. `Fixed-untyped` receives the complete one-hot basis for the total number of
@@ -77,48 +85,60 @@ procedure. The experiment therefore isolates motif specification and
 multiplicity, not differences in effect estimators.
 
 ```bash
-python -m benchmarks.oracle_power_curve \
+python -m benchmarks.objective_recovery_curve \
   --repetitions 100 \
   --decoy-relations 20 \
-  --output benchmarks/results/oracle_power_curve.json
+  --output benchmarks/results/objective_recovery_curve.json
 ```
 
-### Oracle-gap reference result
+### Objective-recovery reference result
 
 The checked-in run uses 100 repetitions, 80 focal units, 199 conditional
 randomizations, `alpha=0.05`, and seed `20260730`.
 
-| Spillover `beta` | Automatic: true motif | Specified oracle | Oracle gap | Fixed untyped | Any decoy |
-|---:|---:|---:|---:|---:|---:|
-| 0.00 | 0.01 | 0.05 | 0.04 | 0.05 | 0.03 |
-| 0.25 | 0.07 | 0.22 | 0.15 | 0.05 | 0.05 |
-| 0.50 | 0.27 | 0.73 | 0.46 | 0.06 | 0.03 |
-| 0.75 | 0.76 | 0.95 | 0.19 | 0.06 | 0.03 |
-| 1.00 | 0.96 | 1.00 | 0.04 | 0.05 | 0.04 |
-| 1.25 | 1.00 | 1.00 | 0.00 | 0.05 | 0.03 |
-| 1.50 | 1.00 | 1.00 | 0.00 | 0.04 | 0.04 |
+| `beta` | Automatic objective | Hand-specified objective | Fixed-untyped objective | True argmax | Automatic power | Hand-specified power | Exact |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.00 | 0.119 | 0.061 | 0.065 | 0.07 | 0.01 | 0.05 | 1.00 |
+| 0.25 | 0.128 | 0.094 | 0.066 | 0.29 | 0.07 | 0.22 | 1.00 |
+| 0.50 | 0.162 | 0.153 | 0.070 | 0.73 | 0.27 | 0.73 | 1.00 |
+| 0.75 | 0.215 | 0.213 | 0.075 | 0.94 | 0.76 | 0.95 | 1.00 |
+| 1.00 | 0.274 | 0.274 | 0.081 | 0.99 | 0.96 | 1.00 | 1.00 |
+| 1.25 | 0.334 | 0.334 | 0.088 | 1.00 | 1.00 | 1.00 | 1.00 |
+| 1.50 | 0.394 | 0.394 | 0.096 | 1.00 | 1.00 | 1.00 | 1.00 |
 
 The machine-readable result is in
-[`results/oracle_power_curve.json`](results/oracle_power_curve.json).
+[`results/objective_recovery_curve.json`](results/objective_recovery_curve.json).
 
-This ordering is structural, not accidental. Let `H_oracle` contain the two
+The objective ordering is structural, not accidental. Let `H_manual` contain the two
 true motifs and let `H_auto` be the automatically generated superset. For
-every randomized assignment `b`,
+the observed assignment and every randomized assignment `b`,
 
 ```text
-max_{P in H_auto} T_P(b) >= max_{P in H_oracle} T_P(b).
+max_{P in H_auto} T_P(b) >= max_{P in H_manual} T_P(b).
 ```
 
-The maxT adjusted p-value of either true motif under automatic search is
-therefore never smaller than its oracle p-value. Automatic rejection of a true
-motif implies oracle rejection in every paired trial. The scientifically
-useful question is how quickly the automatic method closes this unavoidable
-oracle gap while retaining valid global discovery over unknown patterns.
+The implementation additionally compares each pruned observed maximum with
+exhaustive enumeration and asserts equality before recording a trial. The
+`Exact` column is therefore an empirical regression check of the exact-search
+theorem, not an approximation ratio.
 
-`Oracle-specified` is a favorable representation oracle under shared maxT
-inference; it is not a relabeling of the authors' `causalPartition` program.
-The official WWW implementation still needs a separate end-to-end experiment
-for regime recovery and Hajek effect estimation.
+Here `H_manual` is a binary typed-pattern control inside CausalScope's current
+grammar. It is not the full WWW normalized motif-count representation. A
+strict common-objective dominance claim over WWW itself requires the planned
+cardinality-exposure grammar and official-code adapter.
+
+The larger family also has a larger raw maximum under the null (`0.119` versus
+`0.061`), so objective dominance alone is not evidence of causal discovery.
+The true-argmax, adjusted-power, and null-FWER columns are required to separate
+signal recovery from maximization over noise.
+
+This experiment still uses an explicit, flat one-hop family. Its mean pruning
+fraction is only about `0.4%`, so it establishes exact correctness and
+recovery, not a runtime advantage over exhaustive mining. Demonstrating the
+computational claim requires the planned multi-level canonical pattern-growth
+benchmark. The hand-specified controls also share CausalScope's maxT inference;
+they are not the authors' `causalPartition` program. The official WWW
+implementation remains a separate end-to-end baseline.
 
 ## Planned layout
 
