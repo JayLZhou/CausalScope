@@ -33,6 +33,17 @@ Consequently, the current common-objective dominance result applies to a
 correctly hand-specified binary-pattern subset, not to the complete WWW
 algorithm.
 
+An exact sub-two search design for a separate additive motif-count grammar is
+documented in
+[`docs/sub_two_closed_motif_search.md`](docs/sub_two_closed_motif_search.md).
+It reduces score-preserving causal closures to weighted maximal bicliques and
+targets a branching factor of approximately `1.3954`. The checked-in formal
+context code is currently a correctness oracle for the reduction, not yet the
+production weighted-IPS implementation.
+The documented hybrid bound compares this incidence-size measure explicitly
+with `2^(number of atoms)` and falls back to powerset search when IPS is not
+the smaller exact route.
+
 ## Quick start
 
 ```bash

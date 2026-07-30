@@ -82,17 +82,22 @@ requested level.
 
 ## Next implementation milestone
 
-The current `PatternFamily` is an explicit correctness oracle. The production
-miner will replace it with a lazy child provider implementing:
+The current `PatternFamily` is an explicit correctness oracle for binary
+existential exposure. The production miner has two separate algorithmic
+tracks:
 
-1. minimum canonical DFS codes;
-2. rightmost-path extensions;
-3. projected embedding databases grouped by root unit;
-4. structural minimum-support pruning;
-5. assignment bitsets for treatment literals;
-6. child ordering by the assignment-wise envelope.
+1. a lazy canonical DFS engine for the binary-existential statistic in this
+   document;
+2. a closed-biclique optimizer for additive motif-count exposure.
 
-The randomization search must consume a generic lazy pattern-tree interface so
-that its statistical logic remains unchanged when the gSpan engine replaces
-the explicit family.
+The second track is specified in
+[`sub_two_closed_motif_search.md`](sub_two_closed_motif_search.md). It uses
+causal closure, twin-compressed embedding transactions, and a weighted
+partition-oriented biclique search. Its proposed worst-case branching factor
+is approximately `1.3954`, rather than a power of two with a different
+parameter. The claim applies only to the additive count-exposure grammar
+stated there.
 
+Both tracks require projected embedding databases and assignment bitsets.
+Their statistics must not be mixed silently: binary existential exposure is
+not additive over embeddings.
