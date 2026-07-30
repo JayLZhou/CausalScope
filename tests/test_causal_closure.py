@@ -161,3 +161,58 @@ def test_vector_twin_compression_and_projection_are_lossless() -> None:
                 compressed.project(coordinate).score(intent)
                 == abs(context.score_vector(intent)[coordinate])
             )
+
+
+def test_witness_anchored_search_finds_every_supported_closed_intent() -> None:
+    context = RandomizationFormalContext(
+        atoms=("a", "b", "c", "d"),
+        witnesses=(
+            VectorWeightedWitness("w0", frozenset({"a", "b", "c"}), (2.0,)),
+            VectorWeightedWitness("w1", frozenset({"a", "b"}), (-4.0,)),
+            VectorWeightedWitness("w2", frozenset({"a", "d"}), (3.0,)),
+        ),
+    )
+    exhaustive = {
+        intent
+        for intent in context.intents()
+        if context.extent(intent) and context.closure(intent) == intent
+    }
+
+    assert set(context.supported_closed_intents()) == exhaustive
+
+
+def test_generator_cap_does_not_cap_closed_pattern_size() -> None:
+    context = RandomizationFormalContext(
+        atoms=("a", "b", "c"),
+        witnesses=(
+            VectorWeightedWitness("w0", frozenset({"a", "b", "c"}), (3.0,)),
+            VectorWeightedWitness("w1", frozenset({"a", "b"}), (-1.0,)),
+        ),
+    )
+
+    closed = context.supported_closed_intents(max_generator_size=1)
+
+    assert frozenset({"a", "b", "c"}) in closed
+
+
+def test_witness_anchored_maximum_matches_exhaustive_closed_search() -> None:
+    context = RandomizationFormalContext(
+        atoms=("a", "b", "c"),
+        witnesses=(
+            VectorWeightedWitness("w0", frozenset({"a", "b"}), (5.0, -2.0)),
+            VectorWeightedWitness("w1", frozenset({"a", "c"}), (-8.0, 4.0)),
+            VectorWeightedWitness("w2", frozenset({"a"}), (1.0, 3.0)),
+        ),
+    )
+
+    for coordinate in range(context.dimension):
+        actual = context.maximum_from_supported_generators(coordinate)
+        expected = max(
+            (
+                abs(context.score_vector(intent)[coordinate])
+                for intent in context.intents()
+                if context.extent(intent)
+            ),
+            default=0.0,
+        )
+        assert actual.score == expected

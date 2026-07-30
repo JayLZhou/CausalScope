@@ -202,6 +202,69 @@ class RandomizationFormalContext:
                 totals[coordinate] += weight
         return tuple(totals)
 
+    def supported_closed_intents(
+        self,
+        *,
+        max_generator_size: int | None = None,
+    ) -> tuple[frozenset[str], ...]:
+        """Enumerate closures from generators contained in witness signatures.
+
+        Every nonempty-extent pattern is contained in at least one witness
+        transaction. Restricting generator size does not restrict the size of
+        the resulting closure.
+        """
+
+        if max_generator_size is not None and max_generator_size < 0:
+            raise ValueError("max_generator_size must be nonnegative")
+
+        closed: set[frozenset[str]] = set()
+        for witness in self.witnesses:
+            atoms = tuple(sorted(witness.atoms))
+            limit = (
+                len(atoms)
+                if max_generator_size is None
+                else min(max_generator_size, len(atoms))
+            )
+            for size in range(limit + 1):
+                for generator in itertools.combinations(atoms, size):
+                    closed.add(self.closure(frozenset(generator)))
+        return tuple(
+            sorted(
+                closed,
+                key=lambda intent: (len(intent), tuple(sorted(intent))),
+            )
+        )
+
+    def maximum_from_supported_generators(
+        self,
+        coordinate: int,
+        *,
+        max_generator_size: int | None = None,
+    ) -> ClosedIntentResult:
+        """Return the best exact coordinate score in a generator family."""
+
+        if not 0 <= coordinate < self.dimension:
+            raise IndexError("coordinate is outside the score vector")
+        intents = self.supported_closed_intents(
+            max_generator_size=max_generator_size
+        )
+        if not intents:
+            raise ValueError("the context has no supported patterns")
+        return max(
+            (
+                ClosedIntentResult(
+                    intent=intent,
+                    score=abs(self.score_vector(intent)[coordinate]),
+                )
+                for intent in intents
+            ),
+            key=lambda result: (
+                result.score,
+                -len(result.intent),
+                tuple(sorted(result.intent)),
+            ),
+        )
+
     def compress_twins(self) -> RandomizationFormalContext:
         grouped: dict[frozenset[str], list[VectorWeightedWitness]] = {}
         for witness in self.witnesses:

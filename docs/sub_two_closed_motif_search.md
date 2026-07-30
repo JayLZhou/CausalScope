@@ -131,7 +131,78 @@ w(C) = sum_{(b, phi) in C} omega(b, phi).
 This preserves `S(P)` for every pattern, not only the optimum. Let `R_tau` be
 the resulting set of distinct stacked witness signatures.
 
-## 4. Weighted IPS optimization
+## 4. Witness-anchored exact search
+
+The global atom powerset is the wrong baseline. Define the transaction width
+
+```text
+s_tau = max_{C in R_tau} |t(C)|.
+```
+
+Every pattern with nonempty extent matches at least one witness signature
+`C`, and therefore is a subset of `t(C)`. Enumerating subsets inside each
+compressed signature covers every supported pattern:
+
+```text
+union_{C in R_tau} powerset(t(C)).
+```
+
+Closing each generated subset and deduplicating closed intents gives an exact
+algorithm with bound
+
+```text
+O*(R_tau * 2^s_tau),
+```
+
+instead of `2^|A_tau|`. The global label, type, and predicate vocabulary may
+make `|A_tau|` large without increasing the number of atoms simultaneously
+satisfied by one embedding.
+
+For interpretable motifs, bound the size of a generator rather than the size
+of its closure. Let
+
+```text
+C_tau,l = {G'' : G subseteq t(C), C in R_tau, |G| <= l}.
+```
+
+The resulting closed pattern `G''` may contain more than `l` atoms; only its
+shortest searched explanation is bounded. Exact optimization over this
+declared family takes
+
+```text
+O*(
+  R_tau * sum_{j=0..l} binomial(s_tau, j)
+)
+  <= O*(R_tau * (e * s_tau / l)^l).
+```
+
+### Theorem 1: witness anchoring is complete
+
+Every supported closed intent occurs in the unrestricted witness-anchored
+search. Every closed intent having a generator of size at most `l` occurs in
+the generator-bounded search.
+
+Proof: choose any witness in the nonempty extent of the intent. The intent,
+or its size-`l` generator, is contained in that witness transaction and is
+therefore enumerated. Applying closure recovers the closed intent.
+
+### Property-graph width guarantee
+
+Transaction width is controlled by the local grammar rather than graph size.
+For at most `K` roles, at most `L` simultaneously active labels per role,
+`q` property slots of predicate-lattice depth at most `h`, one treatment
+literal per role, and at most `E` relationship atoms per ordered role pair,
+
+```text
+s_tau <= K * (L + q*h + 1) + K*(K-1)*E.
+```
+
+Thus, for fixed local motif size and schema slots, unrestricted search is FPT
+in `s_tau` and generator-bounded search is polynomial in the graph size and
+global atom vocabulary. These quantities are measured directly from the
+projected witness database, so the condition is checkable before search.
+
+## 5. Weighted IPS optimization
 
 For each assignment coordinate `b` and sign `s in {-1, +1}`, assign a
 compressed witness scalar weight `s * w(C)[b]` and solve the maximum-weight
@@ -157,7 +228,7 @@ the branch. The path/cycle DP carries constant boundary states recording
 selection and domination, so maximality is enforced in linear time. A single
 additional bit records whether a treatment atom has been selected.
 
-### Theorem 1: exactness
+### Theorem 2: exactness
 
 Weighted IPS returns the same maximum `T_b` as exhaustive scoring over every
 pattern in the fixed skeleton family.
@@ -172,7 +243,7 @@ Proof outline:
   continue the IPS recursion.
 - Taking both signs recovers the absolute statistic.
 
-### Theorem 2: literal sub-two branching
+### Theorem 3: literal sub-two branching
 
 Let
 
@@ -210,25 +281,14 @@ signs and does not affect the exponential base.
 This is a base below two, not a replacement of `2^M` by `2^w`. The exponent is
 the compressed incidence-instance size used by the branching algorithm.
 
-### Corollary 2: honest comparison with atom-subset enumeration
+### Corollary 2: exact hybrid without a global atom powerset
 
-Let `A = |A_tau|` and `R = |R_tau|`. Keep exhaustive atom-subset scoring as a
-fallback and choose the cheaper exact solver:
-
-```text
-O*(min{2^A, alpha^(A + R)}).
-```
-
-Therefore weighted IPS is strictly better than the atom powerset bound when
+Let `A = |A_tau|`, `R = |R_tau|`, and `s = s_tau`. Choose the cheaper exact
+solver for the unrestricted supported-pattern family:
 
 ```text
-R < (log_alpha(2) - 1) * A
-  approximately 1.0804 * A.
+O*(min{R * 2^s, alpha^(A + R), alpha^gamma}).
 ```
-
-It is not honest to claim that `alpha^(A+R)` universally dominates `2^A`;
-they use different measures. The hybrid is never asymptotically worse than
-the powerset route and has a checkable strict-improvement condition.
 
 IPS's inclusion-exclusion decomposition can also be carried over: every
 maximal biclique is assigned to exactly one rooted incidence subinstance, and
@@ -244,12 +304,12 @@ in the twin-compressed incidence graph, the output-free optimization bound is
 O*(alpha^gamma).
 ```
 
-Ignoring polynomial factors, this route beats `2^A` whenever
-`gamma < log_alpha(2) * A`, approximately `2.0804 * A`. The production solver
-will select the minimum among powerset, direct IPS, and decomposed IPS from
-their exact instance statistics.
+The production solver selects witness anchoring, direct IPS, or decomposed
+IPS from the measured `s`, `A`, `R`, and `gamma`. For generator length `l`,
+the first term is replaced by
+`R * sum_{j=0..l} binomial(s,j)`.
 
-## 5. Topology and canonicality
+## 6. Topology and canonicality
 
 Run the incidence optimization for each rooted connected wildcard skeleton up
 to `K` roles. Every connected property-graph pattern contains such a skeleton.
@@ -260,7 +320,7 @@ For fixed `K`, the number of skeletons is a parameter-only multiplier.
 Projected embedding databases construct witness transactions without issuing
 one GQL query per atom subset.
 
-## 6. Randomization inference
+## 7. Randomization inference
 
 Run the exact optimizer for the observed assignment and every conditional
 randomization. The resulting maxima are identical to exhaustive maxima over
@@ -275,7 +335,7 @@ The optimization can additionally use assignment-wise causal envelopes.
 Those bounds only remove branches; they are not needed to obtain the
 sub-two recurrence.
 
-## 7. Claim boundary
+## 8. Claim boundary
 
 The reduction requires:
 
@@ -285,7 +345,7 @@ The reduction requires:
 - connectedness supplied by a mandatory rooted skeleton;
 - at least one selected treatment literal and one matched witness, enforced as
   constant-size DP/branch states;
-- no hard cap on the number of closure refinement atoms.
+- bounded generator length is allowed, but a hard cap on closure size is not.
 
 It does not yet cover:
 
@@ -296,11 +356,16 @@ It does not yet cover:
 - observational identification assumptions.
 
 The executable `RandomizationFormalContext` is a correctness oracle for
-vector-preserving closure and twin compression. The checked-in path/cycle
-terminal DP is exact. The remaining production milestone is the full weighted
-IPS recursion.
+vector-preserving closure, twin compression, and witness-anchored generator
+search. The checked-in path/cycle terminal DP is exact. The remaining
+production milestone is the full weighted IPS recursion.
 
-## 8. Algorithmic lineage
+With complementary literals available as grammar atoms, unrestricted
+optimization is Maximum Monomial Agreement; even its monotone form is
+NP-hard. The width or generator parameter is therefore substantive, rather
+than cosmetic.
+
+## 9. Algorithmic lineage
 
 - Yuan, Altenburger, and Kooti,
   [Causal Network Motifs](https://arxiv.org/abs/2010.09911), WWW 2021:
@@ -313,3 +378,10 @@ IPS recursion.
   [IPS](https://arxiv.org/abs/2602.21700), SIGMOD 2026: the
   partition-oriented maximal-biclique recursion and the `1.3954` branch bound
   adapted here from enumeration to causal optimization.
+- Eckstein and Goldberg,
+  [Maximum Monomial Agreement](https://doi.org/10.1287/ijoc.1110.0459),
+  INFORMS Journal on Computing 2012: NP-hardness context and exact
+  branch-and-bound for weighted conjunction discovery.
+- Feldman,
+  [Optimal Hardness Results for Maximizing Agreements with Monomials](https://doi.org/10.1109/CCC.2006.31),
+  CCC 2006: hardness of monotone monomial agreement.

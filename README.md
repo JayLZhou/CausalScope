@@ -37,12 +37,12 @@ An exact sub-two search design for a separate additive motif-count grammar is
 documented in
 [`docs/sub_two_closed_motif_search.md`](docs/sub_two_closed_motif_search.md).
 It reduces score-preserving causal closures to weighted maximal bicliques and
-targets a branching factor of approximately `1.3954`. The checked-in formal
-context code is currently a correctness oracle for the reduction, not yet the
-production weighted-IPS implementation.
-The documented hybrid bound compares this incidence-size measure explicitly
-with `2^(number of atoms)` and falls back to powerset search when IPS is not
-the smaller exact route.
+adds witness-anchored exact search with `O*(R * 2^s)` complexity, where `s` is
+the maximum number of atoms simultaneously satisfied by one embedding rather
+than the global atom vocabulary. Generator-bounded search replaces `2^s` by
+`sum(j=0..l, binomial(s,j))`. The IPS track targets a branching factor of
+approximately `1.3954`. The checked-in formal-context and terminal-DP code are
+correctness oracles; the full production weighted-IPS recursion remains.
 
 ## Quick start
 
